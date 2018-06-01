@@ -3,589 +3,422 @@
 error_reporting(-1);
 
 const FIELD_SIZE = 10;
+const MOUSE_FIELD_OF_VIEW = 9;
 
 abstract class Animal
 {
-    public $name;
-    public $posX;
-    public $posY;
-    public $decisions;
-    function stay()
-    {}
-    function goUp(){
-        $this->posY++;
-        $this->decisions->posY++;
-    }
-    function goDown(){
-        $this->posY--;
-        $this->decisions->posY--;
-    }
-    function goRight(){
-        $this->posX++;
-        $this->decisions->posX++;
-    }
-    function goLeft(){
-        $this->posX--;
-        $this->decisions->posX--;
-    }
-}
+	public $posX;
+	public $posY;
 
-class Cat extends Animal
-{
-    public $name = 'cat';
-    public $sleep;
-    public $decisions;
-    public $turnsToWakeUp;
-    function __construct(int $a, int $b){
-        $this->posX = $a;
-        $this->posY = $b;
-        $this->sleep = 0;
-        $this->turnsToWakeUp = 0;
-        $this->decisions = new CatDecisions($a, $b);
-    }
-    function goUpRight(){
-        $this->posX++;
-        $this->posY++;
-        $this->decisions->posX++;
-        $this->decisions->posY++;
-    }
-    function goUpLeft(){
-        $this->posX--;
-        $this->posY++;
-        $this->decisions->posX--;
-        $this->decisions->posY++;
-    }
-    function goDownRight(){
-        $this->posX++;
-        $this->posY--;
-        $this->decisions->posX++;
-        $this->decisions->posY--;
-    }
-    function goDownLeft(){
-        $this->posX--;
-        $this->posY--;
-        $this->decisions->posX--;
-        $this->decisions->posY--;
-    }
+	public function goUp()
+	{
+		$this->posY--;
+	}
+
+	public function goRight()
+	{
+		$this->posX++;
+	}
+
+	public function goLeft()
+	{
+		$this->posX--;
+	}
+
+	public function goDown()
+	{
+		$this->posY++;
+	}
+
 }
 
 class Mouse extends Animal
 {
-    public $name = "mouse";
-    public $decisions;
-    function __construct(int $a, int $b){
-        $this->posX = $a;
-        $this->posY = $b;
-        $this->decisions = new MouseDecisions($a, $b);
-    }
-    public function checkMouseAlone($animals) {
-        $mousesAround = 0;
-        foreach($animals as $animal) {
-            if($animal->name == "mouse" && ((abs($animal->posX - $this->posX) <= 2) && (abs($animal->posY - $this->posY) <= 2))){
-                if(($this->posX == $animal->posX) && ($this->posY == $animal->posY)) {}
-                else {
-                    $mousesAround++;
-                }
-            }
-            if($mousesAround >= 2) return 0;
-        }
-        return 1;
-    }
+
+	public function __construct(int $posX, int $posY)
+	{
+		$this->posX = $posX;
+		$this->posY = $posY;
+	}
+
+	public function makeDecision(Map $map)
+	{
+	    $decisions = array('Up' => 0, 'UpRight' => 0, 'Right' => 0, 'DownRight' => 0, 
+						   'Down' => 0, 'DownLeft' => 0, 'Left' => 0, 'UpLeft' => 0);
+		$decisions = checkBorders($this) + $decisions;
+		$animalsInRadius = array();
+		if(MOUSE_FIELD_OF_VIEW <= FIELD_SIZE) {
+			$maxRadius = MOUSE_FIELD_OF_VIEW;
+		} else {
+			$maxRadius = FIELD_SIZE;
+		}
+		for($radius = 1; $radius < $maxRadius; $radius++) {
+			$animalsInRadius = $map->searchInRadius($this->posX, $this->posY, $radius);
+			if(count($animalsInRadius) == 1) {
+			} else {
+				foreach($animalsInRadius as $animal) {
+					if($animal == $this) {
+					} elseif ($animal instanceof Mouse) {
+						if($radius == 1) {
+							$decisions[checkDirection($this, $animal)] += -100;
+						} else {
+							$decisions[checkDirection($this, $animal)] += 1;
+						}							
+					} elseif ($animal instanceof Cat) {
+						$direction = checkDirection($this, $animal);
+						if($direction == 'Up') {
+						    $decisions[$direction] += -1;
+						    $decisions['UpRight'] += -1;
+						    $decisions['UpLeft'] += -1;
+						} elseif($direction == 'UpRight') {
+						    $decisions[$direction] += -1;
+						    $decisions['Up'] += -1;
+						    $decisions['Right'] += -1;
+						} elseif($direction == 'Right') {
+						    $decisions[$direction] += -1;
+						    $decisions['UpRight'] += -1;
+						    $decisions['DownRight'] += -1;
+						} elseif($direction == 'DownRight') {
+						    $decisions[$direction] += -1;
+						    $decisions['Right'] += -1;
+						    $decisions['Down'] += -1;
+						} elseif($direction == 'Down') {
+						    $decisions[$direction] += -1;
+						    $decisions['DownLeft'] += -1;
+						    $decisions['DownRight'] += -1;
+						} elseif($direction == 'DownLeft') {
+						    $decisions[$direction] += -1;
+						    $decisions['Left'] += -1;
+						    $decisions['Down'] += -1;
+						} elseif($direction == 'Left') {
+						    $decisions[$direction] += -1;
+						    $decisions['UpLeft'] += -1;
+						    $decisions['DownLeft'] += -1;
+						} elseif($direction == 'UpLeft') {
+						    $decisions[$direction] += -1;
+						    $decisions['Left'] += -1;
+						    $decisions['Up'] += -1;
+						}
+					}
+				}
+			}
+		}
+		var_dump($decisions);
+		$maxValuableDecision['value'] = -1;
+		$maxValuableDecision['name'] = 'stay';
+		foreach ($decisions as $decision => $value) {
+			if($value > $maxValuableDecision['value']) {
+				$maxValuableDecision['value'] = $value;
+				$maxValuableDecision['name'] = $decision;
+			}
+		}
+		var_dump($maxValuableDecision);
+		if ($maxValuableDecision['name'] == 'stay') {
+			return 0;
+		} elseif ($maxValuableDecision['name'] == 'Up') {
+			$this->goUp();
+		} elseif ($maxValuableDecision['name'] == 'UpRight') {
+			$this->goRight();
+		} elseif ($maxValuableDecision['name'] == 'Right') {
+			$this->goRight();
+		} elseif ($maxValuableDecision['name'] == 'DownRight') {
+			$this->goRight();
+		} elseif ($maxValuableDecision['name'] == 'Down') {
+			$this->goDown();
+		} elseif ($maxValuableDecision['name'] == 'DownLeft') {
+			$this->goLeft();
+		} elseif ($maxValuableDecision['name'] == 'Left') {
+			$this->goLeft();
+		} elseif ($maxValuableDecision['name'] == 'UpLeft') {
+			$this->goLeft();
+		}
+	}
+
 }
 
-abstract class Decisions
+class Cat extends Animal
 {
-    public $posX;
-    public $posY;
-    function __construct($a, $b){
-        $this->posX = $a;
-        $this->posY = $b;
-    }
+	public $timeToSleep;
+	public $movesDone;
+
+	public function __construct(int $posX, int $posY)
+	{
+		$this->posX = $posX;
+		$this->posY = $posY;
+		$this->timeToSleep = 0;
+		$this->movesDone = 0;
+	}
+
+	public function goUpRight()
+	{
+		$this->posY--;
+		$this->posX++;
+	}
+
+	public function goUpLeft()
+	{
+		$this->posY--;
+		$this->posX--;
+	}
+
+	public function goDownRight()
+	{
+		$this->posY++;
+		$this->posX++;
+	}
+
+	public function goDownLeft()
+	{
+		$this->posY++;
+		$this->posX--;
+	}
+
+	public function makeDecision(Map $map)
+	{
+		if($this->timeToSleep > 0) {
+			$this->timeToSleep--;
+			return 0;
+		}
+		$decisions = array('Up' => 0, 'UpRight' => 0, 'Right' => 0, 'DownRight' => 0, 
+						   'Down' => 0, 'DownLeft' => 0, 'Left' => 0, 'UpLeft' => 0);
+		$decisions = checkBorders($this) + $decisions;
+		$animalsInRadius = array();
+		$maxRadius = FIELD_SIZE;
+		for($radius = 1; $radius < $maxRadius; $radius++) {
+			$animalsInRadius = $map->searchInRadius($this->posX, $this->posY, $radius);
+			if(count($animalsInRadius) == 1) {
+			} else {
+				foreach($animalsInRadius as $animal) {
+					if($animal == $this) {
+					} elseif ($animal instanceof Mouse) {
+						if($radius == 1) {
+							$mousesAround = 0;
+							foreach($animalsInRadius as $nearestAnimal) {
+								if($nearestAnimal instanceof Mouse) {
+									if($animal == $nearestAnimal) {
+									} elseif(checkDistance($animal, $nearestAnimal) == 1) {
+										$mousesAround++;
+									} 
+								}
+							}
+							if($mousesAround >= 2) {
+								$decisions[checkDirection($this, $animal)] += -1;
+							}
+							else {
+								$decisions[checkDirection($this, $animal)] += 100;
+							}
+						} else {
+							$decisions[checkDirection($this, $animal)] += 1;
+						}							
+					} elseif ($animal instanceof Cat) {
+						$decisions[checkDirection($this, $animal)] += -1;	
+					}
+				}
+			}
+		}
+		$maxValuableDecision['value'] = 0;
+		$maxValuableDecision['name'] = 'stay';
+		foreach ($decisions as $decision => $value) {
+			if($value > $maxValuableDecision['value']) {
+				$maxValuableDecision['value'] = $value;
+				$maxValuableDecision['name'] = $decision;
+			}
+		}
+		if($maxValuableDecision['name'] == 'stay') {
+			return 0;
+		} elseif($maxValuableDecision['name'] == 'Up') {
+			$this->goUp();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'UpRight') {
+			$this->goUpRight();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'Right') {
+			$this->goRight();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'DownRight') {
+			$this->goDownRight();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'Down') {
+			$this->goDown();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'DownLeft') {
+			$this->goDownLeft();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'Left') {
+			$this->goLeft();
+			$this->movesDone++;
+		} elseif ($maxValuableDecision['name'] == 'UpLeft') {
+			$this->goUpLeft();
+			$this->movesDone++;
+		}
+		foreach($map->animals as $animal) {
+			if($animal instanceof Mouse) {
+				if($animal->posX == $this->posX && $animal->posY == $this->posY) {
+					$this->eatMouse($animal, $map);
+					$this->timeToSleep = 1;
+					return 0;
+				}
+			}
+		}
+		if($this->movesDone == 8 ) {
+			$this->timeToSleep = 1;
+		}
+	}
+
+	public function eatMouse(Mouse $mouse, Map $map)
+	{
+		$map->deleteAnimal($mouse);
+	}
+
 }
 
-class CatDecisions extends Decisions
+class Map
 {
-    function goUp($animals) {
-        $result = 0;
-        if($this->posY == FIELD_SIZE){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY+1)) && ($animal->posX == $this->posX) && ($animal->checkMouseAlone($animals) == 1)){
-                    return 100;
-                }
-                else if(($animal->posY == ($this->posY+1)) && ($animal->posX == $this->posX) && ($animal->checkMouseAlone($animals) == 0)){
-                    return -1;
-                }
-                else if(($animal->posY - $this->posY <= 3) && ($animal->posX == $this->posX)){
-                    if(($animal->posY - $this->posY) < 0){}
-                    else $result += 5;
-                }
-                else if(($animal->posY > $this->posY) && ($animal->posX == $this->posX)){
-                    $result += 2;
-                }
-                else if($animal->posY > $this->posY){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == ($this->posY + 1)) && ($animal->posX == $this->posX)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goDown($animals) {
-        $result = 0;
-        if($this->posY == 0){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY-1)) && ($animal->posX == $this->posX) && ($animal->checkMouseAlone($animals) == 1)){
-                    return 100;
-                }
-                else if(($animal->posY == ($this->posY-1)) && ($animal->posX == $this->posX) && ($animal->checkMouseAlone($animals) == 0)){
-                    return -1;
-                }
-                else if(($this->posY - $animal->posY <= 3) && ($animal->posX == $this->posX)){
-                    if(($this->posY - $animal->posY) < 0){}
-                    else $result += 5;
-                }
-                else if(($animal->posY < $this->posY) && ($animal->posX == $this->posX)){
-                    $result += 2;
-                }
-                else if($animal->posY < $this->posY){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == ($this->posY - 1)) && ($animal->posX == $this->posX)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goRight($animals) {
-        $result = 0;
-        if($this->posX == FIELD_SIZE){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX + 1)) && ($animal->checkMouseAlone($animals) == 1)){
-                    return 100;
-                }
-                else if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX + 1)) && ($animal->checkMouseAlone($animals) == 0)){
-                    return -1;
-                }
-                else if(($animal->posX - $this->posX) <= 3 && ($animal->posY == $this->posY)){
-                    if(($animal->posX - $this->posX) < 0){}
-                    else $result += 5;
-                }
-                else if(($animal->posX > $this->posX) && ($animal->posY == $this->posY)){
-                    $result += 2;
-                }
-                else if($animal->posX > $this->posX){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX + 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goLeft($animals) {
-        $result = 0;
-        if($this->posX == 0){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX- 1)) && ($animal->checkMouseAlone($animals) == 1)){
-                    return 100;
-                }
-                else if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX - 1)) && ($animal->checkMouseAlone($animals) == 0)){
-                    return -1;
-                }
-                else if(($this->posX - $animal->posX) <= 3 && ($animal->posY == $this->posY)){
-                    if(($this->posX - $animal->posX) < 0){}
-                    else $result += 5;
-                }
-                else if(($animal->posX > $this->posX) && ($animal->posY == $this->posY)){
-                    $result += 2;
-                }
-                else if($animal->posY > $this->posY){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == $this->posY) && ($animal->posX == ($this->posX - 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goUpRight($animals) {
-        $result = 0;
-        if(($this->posX == FIELD_SIZE) or ($this->posY == FIELD_SIZE)){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY + 1)) && ($animal->posX == ($this->posX + 1))){
-                    if($animal->checkMouseAlone($animals) == 1){
-                        return 200;
-                    }
-                    else if($animal->checkMouseAlone($animals) == 0){
-                        return -1;
-                    }
-                }
-                else if((($animal->posX - $this->posX) <= 3) && (($animal->posY - $this->posY) <= 3)){
-                    if((($animal->posX - $this->posX) < 0) or (($animal->posY - $this->posY) < 0)){}
-                    else $result += 5;
-                }
-                else if(($animal->posX > $this->posX) && ($animal->posY > $this->posY)){
-                    $result += 2;
-                }
-                else if(($animal->posY > $this->posY) or ($animal->posX > $this->posX)){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == "cat") {
-                if(($animal->posY == ($this->posY + 1)) && ($animal->posX == ($this->posX + 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goUpLeft($animals) {
-        $result = 0;
-        if(($this->posX == 0) or ($this->posY == FIELD_SIZE)){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY + 1)) && ($animal->posX == ($this->posX - 1))){
-                    if($animal->checkMouseAlone($animals) == 1){
-                        return 200;
-                    }
-                    else{
-                        return -1;
-                    }
-                }
-                else if((($this->posX - $animal->posX) <= 3) && (($animal->posY - $this->posY) <= 3)){
-                    if((($this->posX - $animal->posX) < 0) or (($animal->posY - $this->posY) < 0)){}
-                    else $result += 5;
-                }
-                else if(($animal->posX < $this->posX) && ($animal->posY > $this->posY)){
-                    $result += 2;
-                }
-                else if(($animal->posY < $this->posY) or ($animal->posX > $this->posX)){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == ($this->posY + 1)) && ($animal->posX == ($this->posX - 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goDownRight($animals) {
-        $result = 0;
-        if(($this->posX == FIELD_SIZE) or ($this->posY == 0)){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY - 1)) && ($animal->posX == ($this->posX + 1))){
-                    if($animal->checkMouseAlone($animals) == 1){
-                        return 200;
-                    }
-                    else{
-                        return -1;
-                    }
-                }
-                else if((($animal->posX - $this->posX) <= 3) && (($this->posY - $animal->posY) <= 3)){
-                    if((($animal->posX - $this->posX) < 0) or (($this->posY - $animal->posY) < 0)){}
-                    else $result += 5;
-                }
-                else if(($animal->posX > $this->posX) && ($animal->posY < $this->posY)){
-                    $result += 2;
-                }
-                else if(($animal->posY < $this->posY) or ($animal->posX > $this->posX)){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == ($this->posY - 1)) && ($animal->posX == ($this->posX + 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goDownLeft($animals) {
-        $result = 0;
-        if(($this->posX == 0) or ($this->posY == 0)){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY - 1)) && ($animal->posX == ($this->posX - 1))){
-                    if($animal->checkMouseAlone($animals) == 1){
-                        return 200;
-                    }
-                    else{
-                        return -1;
-                    }
-                }
-                else if((($this->posX - $animal->posX) <= 3) && (($this->posY - $animal->posY) <= 3)){
-                    if((($this->posX - $animal->posX) < 0) or (($this->posY - $animal->posY) < 0)){}
-                    else $result += 5;
-                }
-                else if(($animal->posX < $this->posX) && ($animal->posY < $this->posY)){
-                    $result += 2;
-                }
-                else if(($animal->posY < $this->posY) or ($animal->posX < $this->posX)){
-                    $result += 1;
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY == ($this->posY - 1)) && ($animal->posX == ($this->posX - 1))){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
+	public $animals;
+
+	public function __construct()
+	{
+		$this->animals = array();
+	}
+
+	public function searchInRadius(int $posX, int $posY, int $radius): array
+	{
+		$animalsInRadius = array();
+		$count = 0;
+		foreach($this->animals as $animal) {
+			if(abs($posX - $animal->posX) <= $radius) {
+				if(abs($posY - $animal->posY) <= $radius) {
+					$animalsInRadius[$count] = $animal;
+					$count++;
+				}
+			}
+		}
+		return $animalsInRadius;
+	}
+
+	public function deleteAnimal(animal $animalToDelete) 
+	{
+		$key = array_search($animalToDelete, $this->animals);
+		unset($this->animals[$key]); 
+	}
+
 }
 
-class MouseDecisions extends Decisions
+function checkDirection(animal $from, animal $to): string
 {
-    function goUp($animals) {
-        $result = 0;
-        if($this->posY == FIELD_SIZE){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY + 1)) && (abs($animal->posY - $this->posY) <= 9)){
-                    if($animal->posX == $this->posX){
-                        return -1;
-                    }
-                    else {
-                        $result += 1;
-                    }
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY > $this->posY) && (abs($animal->posY - $this->posY) <= 9)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goDown($animals) {
-        $result = 0;
-        if($this->posY == 0){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posY == ($this->posY - 1)) && (abs($animal->posY - $this->posY) <= 9)){
-                    if($animal->posX == $this->posX){
-                        return -1;
-                    }
-                    else {
-                        $result += 1;
-                    }
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posY < $this->posY) && (abs($animal->posY - $this->posY) <= 9)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goRight($animals) {
-        $result = 0;
-        if($this->posX == FIELD_SIZE){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posX == ($this->posX + 1)) && (abs($animal->posX - $this->posX) <= 9)){
-                    if($animal->posY == $this->posY){
-                        return -1;
-                    }
-                    else {
-                        $result += 1;
-                    }
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posX > $this->posX) && (abs($animal->posX - $this->posX) <= 9)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
-    function goLeft($animals) {
-        $result = 0;
-        if($this->posX == 0){
-            return -1;
-        }
-        foreach($animals as $animal){
-            if($animal->name == "mouse") {
-                if(($animal->posX < $this->posX) && (abs($animal->posX - $this->posX) <= 9)){
-                    if($animal->posY == $this->posY){
-                        return -1;
-                    }
-                    else {
-                        $result += 1;
-                    }
-                }
-            }
-            else if($animal->name == 'cat') {
-                if(($animal->posX < $this->posX) && (abs($animal->posX - $this->posX) <= 9)){
-                    return -1;
-                }
-            }
-        }
-        return $result;
-    }
+	if($from->posY > $to->posY && $from->posX == $to->posX) {
+		return "Up";
+	} elseif ($from->posY > $to->posY && $from->posX < $to->posX) {
+		return "UpRight";
+	} elseif ($from->posY == $to->posY && $from->posX < $to->posX) {
+		return "Right";
+	} elseif ($from->posY < $to->posY && $from->posX < $to->posX) {
+		return "DownRight";
+	} elseif ($from->posY < $to->posY && $from->posX == $to->posX) {
+		return "Down";
+	} elseif ($from->posY < $to->posY && $from->posX > $to->posX) {
+		return "DownLeft";
+	} elseif ($from->posY == $to->posY && $from->posX > $to->posX) {
+		return "Left";
+	} elseif ($from->posY > $to->posY && $from->posX > $to->posX) {
+		return "UpLeft";
+	}
 }
 
-function chooseDecision(Animal $animal, array $animals)
+function checkDistance(animal $from, animal $to): int
 {
-    $decisions = $animal->decisions;
-    $decisionsArr = array();
-    $decisionsArr['goUp'] = $decisions->goUp($animals);
-    $decisionsArr['goRight'] = $decisions->goRight($animals);
-    $decisionsArr['goDown'] = $decisions->goDown($animals);
-    $decisionsArr['goLeft'] = $decisions->goLeft($animals);
-    if($animal->name == 'cat') {
-        if($animal->sleep == 1) {
-            return 'stay';
-        }
-        $decisionsArr['goUpRight'] = $decisions->goUpRight($animals);
-        $decisionsArr['goUpLeft'] = $decisions->goUpLeft($animals);
-        $decisionsArr['goDownLeft'] = $decisions->goDownLeft($animals);
-        $decisionsArr['goDownRight'] = $decisions->goDownRight($animals);
-    }
-    $priorityDecision = -2;
-    $nameDecision;
-    //var_dump($decisionsArr);
-    foreach($decisionsArr as $key => $valueDecision){
-        if($valueDecision > $priorityDecision) {
-            $priorityDecision = $valueDecision;
-            $nameDecision = $key;
-        }
-    }
-    if($priorityDecision == -1) {
-        return 'stay';
-    }
-    else {
-        return $nameDecision;
-    }
+	$x = abs($from->posX - $to->posX);
+	$y = abs($from->posY - $to->posY);
+	$distance = round(sqrt(pow($x, 2) + pow($y, 2)));
+	return $distance; 
 }
 
-function makeDecision(Animal $animal, string $decision){
-    if($decision == 'stay') $animal->stay();
-    else if($decision == 'goUp') $animal->goUp();
-    else if($decision == 'goDown') $animal->goDown();
-    else if($decision == 'goRight') $animal->goRight();
-    else if($decision == 'goLeft') $animal->goLeft();
-    else if($decision == 'goUpRight') $animal->goUpRight();
-    else if($decision == 'goUpLeft') $animal->goUpLeft();
-    else if($decision == 'goDownRight') $animal->goDownRight();
-    else if($decision == 'goDownLeft') $animal->goDownLeft();
-}
-
-function printAnimals($animals) 
+function checkBorders(animal $animal): array
 {
-    $mouses = 1;
-    $thereIsAnimal = 0;
-    for($y = FIELD_SIZE;$y >= 0; $y--){
-        for($x = 0; $x <= FIELD_SIZE; $x++){
-            foreach($animals as $animal){
-                if(($animal->posX == $x) && ($animal->posY == $y)) {
-                    if($animal->name == 'cat'){
-                        if($animal->sleep == 1){
-                            echo "@";
-                            $thereIsAnimal = 1;
-                        }
-                        else {
-                            echo "K";
-                            $thereIsAnimal = 1;
-                        }
-                    }
-                    else if($animal->name == 'mouse') {
-                        echo $mouses;
-                        $mouses++;
-                        $thereIsAnimal = 1;
-                    }
-                }
-            }
-            if($thereIsAnimal) {
-                $thereIsAnimal = 0;
-            }
-            else echo "-";
-        }
-        echo "\n";
-    }
-    echo "\n";
+	$decisions = array();
+	if($animal->posX == FIELD_SIZE) {
+		$decisions['Right'] = -1;
+		$decisions['DownRight'] = -1;
+		$decisions['UpRight'] = -1;
+		if($animal->posY == FIELD_SIZE) {
+			$decisions['Down'] = -1;
+			$decisions['DownLeft'] = -1;
+		} elseif($animal->posY == 1) {
+			$decisions['Up'] = -1;
+			$decisions['UpLeft'] = -1;
+		}
+	} elseif($animal->posX == 1) {
+		$decisions['Left'] = -1;
+		$decisions['DownLeft'] = -1;
+		$decisions['UpLeft'] = -1;
+		if($animal->posY == FIELD_SIZE) {
+			$decisions['Down'] = -1;
+			$decisions['DownRight'] = -1;
+		} elseif($animal->posY == 1) {
+			$decisions['Up'] = -1;
+			$decisions['UpRight'] = -1;
+		}
+	} elseif($animal->posY == FIELD_SIZE){
+		$decisions['Down'] = -1;
+		$decisions['DownLeft'] = -1;
+		$decisions['DownRight'] = -1;
+	} elseif($animal->posY == 1){
+		$decisions['Up'] = -1;
+		$decisions['UpLeft'] = -1;
+		$decisions['UpRight'] = -1;
+	}
+	return $decisions;
 }
 
-$cat1 = new Cat(4,5);
-$cat2 = new Cat(3,1);
-$mouse1 = new Mouse(1,1);
-$mouse2 = new Mouse(9,9);
-$mouse3 = new Mouse(8,8);
-$animals = array($cat1, $cat2, $mouse1, $mouse2, $mouse3);
-for($i = 0; $i < 20; $i++){
-    //var_dump($animals);
-    foreach($animals as $animal) {
-        $decision = chooseDecision($animal, $animals);
-        //echo $decision."\n";
-        //printAnimals($animals);
-        makeDecision($animal, $decision);
-        //printAnimals($animals);
-        if($animal->name == "cat") {
-            $x = $animal->posX;
-            $y = $animal->posY;
-            if($animal->sleep == 0){
-                foreach($animals as $key => $animalMouse){
-                    if($animalMouse->name == 'mouse'){
-                        if(($animalMouse->posX == $x) && ($animalMouse->posY == $y)) {
-                            unset($animals[$key]);
-                            $animal->sleep = 1;
-                        }
-                    }
-                }
-            }
-            else if($animal->turnsToWakeUp > 0){
-                $animal->turnsToWakeUp--;
-            }
-            else {
-                $animal->sleep = 0;
-            }
-        }
-    }
-    printAnimals($animals);
+function printMap($map) 
+{
+	$mapToPrint = array();
+	$mouseCount = 0;
+	foreach ($map->animals as $animal) {
+		if($animal instanceof Mouse) {
+			$mouseCount++;
+			$mapToPrint[$animal->posY][$animal->posX] = $mouseCount;
+		} elseif ($animal instanceof Cat) {
+			$mapToPrint[$animal->posY][$animal->posX] = 'M';
+		}
+	}
+	for($y = 1; $y <= FIELD_SIZE; $y++) {
+		for($x = 1; $x <= FIELD_SIZE; $x++) {
+			if(isset($mapToPrint[$y][$x])) {
+				echo $mapToPrint[$y][$x];
+			} else {
+				echo "-";
+			}
+		}
+		echo "\n";
+	}
+	echo "\n";
 }
+
+function createGame()
+{
+	$mouse1 = new Mouse(2, 5);
+	$mouse2 = new Mouse(4, 8);
+	$mouse3 = new Mouse(4, 5);
+	$cat1 = new Cat(5, 1);
+	$map = new Map();
+	$map->animals = array($mouse1, $mouse2, $mouse3, $cat1);
+	for($i = 0; $i < 50; $i++) {
+		foreach($map->animals as $animal) {
+			if($animal instanceof Mouse) {
+				$animal->makeDecision($map);
+				printMap($map);
+				$i++;
+			}
+		}
+		foreach($map->animals as $animal) {
+			if($animal instanceof Cat) {
+				$animal->makeDecision($map);
+				printMap($map);
+				$i++;
+			}
+		}
+	}
+}
+
+createGame();
