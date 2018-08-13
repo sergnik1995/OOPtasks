@@ -103,7 +103,7 @@ class Mouse extends Animal
 				}
 			}
 		}
-		var_dump($decisions);
+		//var_dump($decisions);
 		$maxValuableDecision['value'] = -1;
 		$maxValuableDecision['name'] = 'stay';
 		foreach ($decisions as $decision => $value) {
@@ -112,25 +112,29 @@ class Mouse extends Animal
 				$maxValuableDecision['name'] = $decision;
 			}
 		}
-		var_dump($maxValuableDecision);
+		//var_dump($maxValuableDecision);
 		if ($maxValuableDecision['name'] == 'stay') {
 			return 0;
 		} elseif ($maxValuableDecision['name'] == 'Up') {
 			$this->goUp();
 		} elseif ($maxValuableDecision['name'] == 'UpRight') {
-			$this->goRight();
+			if($decisions['Up'] > $decisions['Right']) $this->goUp();
+			else if($decisions['Up'] < $decisions['Right']) $this->goRight();
 		} elseif ($maxValuableDecision['name'] == 'Right') {
 			$this->goRight();
 		} elseif ($maxValuableDecision['name'] == 'DownRight') {
-			$this->goRight();
+			if($decisions['Down'] > $decisions['Right']) $this->goDown();
+			else if($decisions['Down'] < $decisions['Right']) $this->goRight();
 		} elseif ($maxValuableDecision['name'] == 'Down') {
 			$this->goDown();
 		} elseif ($maxValuableDecision['name'] == 'DownLeft') {
-			$this->goLeft();
+			if($decisions['Down'] > $decisions['Left']) $this->goDown();
+			else if($decisions['Down'] < $decisions['Left']) $this->goLeft();
 		} elseif ($maxValuableDecision['name'] == 'Left') {
 			$this->goLeft();
 		} elseif ($maxValuableDecision['name'] == 'UpLeft') {
-			$this->goLeft();
+			if($decisions['Up'] > $decisions['Left']) $this->goUp();
+			else if($decisions['Up'] < $decisions['Left']) $this->goLeft();
 		}
 	}
 
@@ -224,6 +228,8 @@ class Cat extends Animal
 				$maxValuableDecision['name'] = $decision;
 			}
 		}
+		//var_dump($decisions);
+		//var_dump($maxValuableDecision);
 		if($maxValuableDecision['name'] == 'stay') {
 			return 0;
 		} elseif($maxValuableDecision['name'] == 'Up') {
@@ -333,9 +339,45 @@ function checkDistance(animal $from, animal $to): int
 	return $distance; 
 }
 
-function checkBorders(animal $animal): array
+function checkBorders(Animal $animal, Map $map = NULL): array
 {
 	$decisions = array();
+	if($map != NULL) {
+	    $nearestAnimals = array();
+	    $nearestAnimals = $map->searchInRadius($animal->posX, $animal->posY, 1);
+	    foreach($nearestAnimals as $nearestAnimal) {
+	        if($nearestAnimal->posY == ($animal->posY - 1)) {
+	            if($nearestAnimal->posX == ($animal->posX - 1)) {
+	                $decisions['UpLeft'] = -1;
+	            }
+	            else if($nearestAnimal->posX == $animal->posX) {
+	                $decisions['Up'] = -1;
+	            }
+	            else if($nearestAnimal->posX == ($animal->posX + 1)) {
+	                $decisions['UpRight'] = -1;
+	            }
+	        }
+	        else if($nearestAnimal->posY == $animal->posY) {
+	            if($nearestAnimal->posX == ($animal->posX - 1)) {
+	                $decisions['Left'] = -1;
+	            }
+	            else if($nearestAnimal->posX == ($animal->posX + 1)) {
+	                $decisions['Right'] = -1;
+	            }
+	        }
+	        else if($nearestAnimal->posY == ($animal->posY + 1)) {
+	            if($nearestAnimal->posX == ($animal->posX - 1)) {
+	                $decisions['DownLeft'] = -1;
+	            }
+	            else if($nearestAnimal->posX == $animal->posX) {
+	                $decisions['Down'] = -1;
+	            }
+	            else if($nearestAnimal->posX == ($animal->posX + 1)) {
+	                $decisions['DownRight'] = -1;
+	            }
+	        }
+	    }
+	}
 	if($animal->posX == FIELD_SIZE) {
 		$decisions['Right'] = -1;
 		$decisions['DownRight'] = -1;
@@ -379,7 +421,12 @@ function printMap($map)
 			$mouseCount++;
 			$mapToPrint[$animal->posY][$animal->posX] = $mouseCount;
 		} elseif ($animal instanceof Cat) {
-			$mapToPrint[$animal->posY][$animal->posX] = 'M';
+		    if($animal->timeToSleep != 0){
+		        $mapToPrint[$animal->posY][$animal->posX] = '@';
+		    }
+			else{ 
+			    $mapToPrint[$animal->posY][$animal->posX] = 'M';
+			}
 		}
 	}
 	for($y = 1; $y <= FIELD_SIZE; $y++) {
@@ -401,23 +448,23 @@ function createGame()
 	$mouse2 = new Mouse(4, 8);
 	$mouse3 = new Mouse(4, 5);
 	$cat1 = new Cat(5, 1);
+	$cat2 = new Cat(6, 3);
 	$map = new Map();
-	$map->animals = array($mouse1, $mouse2, $mouse3, $cat1);
+	$map->animals = array($mouse1, $mouse2, $mouse3, $cat1, $cat2);
+	printMap($map);
 	for($i = 0; $i < 50; $i++) {
 		foreach($map->animals as $animal) {
 			if($animal instanceof Mouse) {
 				$animal->makeDecision($map);
-				printMap($map);
-				$i++;
 			}
 		}
 		foreach($map->animals as $animal) {
 			if($animal instanceof Cat) {
 				$animal->makeDecision($map);
-				printMap($map);
-				$i++;
 			}
 		}
+		$i++;
+		printMap($map);
 	}
 }
 
